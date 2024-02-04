@@ -266,7 +266,6 @@ class_tbl <- data_table$getPageSource() %>%
   .[[1]] %>%
   row_to_names(row_number = 1) %>% 
   mutate(Value = as.factor(Value))
-write_csv("class_tbl.csv")
 
 country_sf$id <- 1:nrow(country_sf)
 
