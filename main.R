@@ -65,11 +65,11 @@ raster_files <- list.files(
 
 crs <- "EPSG:4326"
 
-if(!file.exists("ua_land_cover_vrt.vrt")){
-  for(raster in raster_files){
+if (!file.exists("ua_land_cover_vrt.vrt")) {
+  for (raster in raster_files) {
     cat("Start with:", raster, "\n")
     rasters <- terra::rast(raster)
-    country <- country_sf %>% 
+    country <- country_sf %>%
       sf::st_transform(
         crs = terra::crs(
           rasters
@@ -82,11 +82,11 @@ if(!file.exists("ua_land_cover_vrt.vrt")){
       ),
       snap = "in",
       mask = TRUE
-    ) %>% 
+    ) %>%
       terra::aggregate(
         fact = 5,
         fun = "modal"
-      ) %>% 
+      ) %>%
       terra::project(crs)
     # write raster
     terra::writeRaster(
@@ -96,7 +96,7 @@ if(!file.exists("ua_land_cover_vrt.vrt")){
         "_ua",
         ".tif"
       ),
-      overwrite=FALSE
+      overwrite = FALSE
     )
   }
 }
@@ -127,9 +127,9 @@ raster_color_table <- do.call(
 )
 
 hex_code <- ggtern::rgb2hex(
-  r = raster_color_table[,2],
-  g = raster_color_table[,3],
-  b = raster_color_table[,4]
+  r = raster_color_table[, 2],
+  g = raster_color_table[, 3],
+  b = raster_color_table[, 4]
 )
 
 # 7. Assign colors
@@ -173,7 +173,7 @@ land_cover_ua_resampled <- terra::resample(
   x = land_cover_ua,
   y = terra::rast(elev),
   method = "near"
-) %>% 
+) %>%
   terra::project(crs_lambert)
 
 terra::plotRGB(land_cover_ua_resampled)
@@ -202,16 +202,16 @@ elmat <- rayshader::raster_to_matrix(
 h <- nrow(elev_lambert)
 w <- ncol(elev_lambert)
 
-elmat %>% 
+elmat %>%
   rayshader::height_shade(
     texture = colorRampPalette(
       cols[9]
     )(256)
-  ) %>% 
+  ) %>%
   rayshader::add_overlay(
     img,
     alphalayer = 1
-  ) %>% 
+  ) %>%
   rayshader::plot_3d(
     elmat,
     zscale = 12,
@@ -239,7 +239,7 @@ rayshader::render_highquality(
   filename = filename,
   preview = TRUE,
   light = FALSE,
-  environment_light = here('air_museum_playground_4k.hdr'),
+  environment_light = here("air_museum_playground_4k.hdr"),
   intensity_env = 1,
   rotate_env = 90,
   interactive = FALSE,
@@ -249,22 +249,24 @@ rayshader::render_highquality(
 )
 
 # 11. Get zonal multiclas statistics
-driver <- rsDriver(browser = "firefox",
-                   chromever = "114.0.5735.90",
-                   verbose = FALSE,
-                   port = free_port())
+driver <- rsDriver(
+  browser = "firefox",
+  chromever = "114.0.5735.90",
+  verbose = FALSE,
+  port = free_port()
+)
 
 remDr <- driver$client
 remDr$open()
 remDr$navigate("https://www.arcgis.com/home/item.html?id=cfcb7609de5f478eb7666240902d4d3d")
-data_table <- remDr$findElement(using = "xpath", '/html/body/div[3]/div/div[2]/div/div[2]/div/main/div[2]/div[2]/div[1]/div/div/div/div[8]/table/tbody')
+data_table <- remDr$findElement(using = "xpath", "/html/body/div[3]/div/div[2]/div/div[2]/div/main/div[2]/div[2]/div[1]/div/div/div/div[8]/table/tbody")
 
-class_tbl <- data_table$getPageSource() %>% 
+class_tbl <- data_table$getPageSource() %>%
   unlist() %>%
-  read_html() %>% 
-  html_table() %>% 
+  read_html() %>%
+  html_table() %>%
   .[[1]] %>%
-  row_to_names(row_number = 1) %>% 
+  row_to_names(row_number = 1) %>%
   mutate(Value = as.factor(Value))
 
 country_sf$id <- 1:nrow(country_sf)
@@ -286,28 +288,32 @@ ukraine_multiclass <- future_map_dfr(zonal_stats_ukr, function(x) {
   )
 })
 
-ukraine_multiclass_sf <- ukraine_multiclass %>% 
+ukraine_multiclass_sf <- ukraine_multiclass %>%
   as_tibble() %>%
   left_join(
     class_tbl,
     by = c("Var1" = "Value")
-  ) %>% 
-  mutate(colors = c(
-    "#419bdf", "#397d49", "#7a87c6", 
-    "#e49635", "#c4281b", "#a59b8f", 
-    "#a8ebff", "#616161", "#e3e2c3"
-  ), .after = Name,
-  perc = scales::percent(Freq / sum(Freq), accuracy = .01, trim = FALSE)) %>% 
-  arrange(desc(Freq)) %>% 
-  filter(!(Name %in% c("Bare ground", 'Snow/Ice', 'Clouds')))
+  ) %>%
+  mutate(
+    colors = c(
+      "#419bdf", "#397d49", "#7a87c6",
+      "#e49635", "#c4281b", "#a59b8f",
+      "#a8ebff", "#616161", "#e3e2c3"
+    ), .after = Name,
+    perc = scales::percent(Freq / sum(Freq), accuracy = .01, trim = FALSE)
+  ) %>%
+  arrange(desc(Freq)) %>%
+  filter(!(Name %in% c("Bare ground", "Snow/Ice", "Clouds")))
 
 # 12. Put all together
 
-plot <- ukraine_multiclass_sf %>% 
+plot <- ukraine_multiclass_sf %>%
   ggplot(aes(x = Freq, y = fct_reorder(Name, Freq))) +
   geom_col(aes(fill = fct_reorder(Name, Freq))) +
   geom_text(
-    aes(label = perc), size = 8, hjust = -0.1, vjust = 0.5, family = "Fira Sans", fontface = "bold") +
+    aes(label = perc),
+    size = 8, hjust = -0.1, vjust = 0.5, family = "Fira Sans", fontface = "bold"
+  ) +
   scale_fill_manual(values = rev(ukraine_multiclass_sf$colors)) +
   theme_void() +
   coord_cartesian(clip = "off") +
@@ -315,7 +321,8 @@ plot <- ukraine_multiclass_sf %>%
   theme(
     legend.position = "none",
     axis.text.y = element_text(size = 28, hjust = 1, family = "Georgia"),
-    plot.margin = margin(15, 85, 15, 15))
+    plot.margin = margin(15, 85, 15, 15)
+  )
 
 legend_name <- "land_cover_legend.png"
 ggsave(legend_name, plot, width = 10, height = 6)
@@ -336,14 +343,14 @@ my_legend_scaled <- magick::image_scale(
 
 p <- magick::image_composite(
   magick::image_scale(
-    lc_img, "x7000" 
+    lc_img, "x7000"
   ),
   my_legend_scaled,
   gravity = "southwest",
   offset = "+1000+1000"
 )
 
-p <- p %>% 
+p <- p %>%
   image_annotate(
     "Land cover in 2022",
     size = 150,
@@ -351,7 +358,7 @@ p <- p %>%
     font = "Georgia",
     gravity = "north",
     location = "+0+300"
-  ) %>% 
+  ) %>%
   image_annotate(
     "Ukraine",
     size = 300,
@@ -359,7 +366,7 @@ p <- p %>%
     font = "Georgia",
     gravity = "north",
     location = "+0+500"
-  ) %>% 
+  ) %>%
   image_annotate(
     "©2024 Ihor Miroshnychenko (https://aranaur.rbind.io)",
     size = 100,
@@ -367,7 +374,7 @@ p <- p %>%
     font = "Georgia",
     gravity = "southeast",
     location = "+100+200"
-  ) %>% 
+  ) %>%
   image_annotate(
     "Data: Esri | Sentinel-2 Land Cover Explorer",
     size = 100,
